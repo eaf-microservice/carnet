@@ -34,41 +34,92 @@ class CustomerDashboard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Multi-Shop Balances
+            // Multi-Shop Sections
             ...user.shopBalances.entries.map((entry) {
               final shopId = entry.key;
               final balance = entry.value;
               final shop = appState.getShopById(shopId);
               final shopName = shop?.name ?? 'حانوت مجهول';
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(24),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primary,
-                      const Color(0xFF003366),
-                    ],
-                  ),
+              // Transactions for this specific shop
+              final shopTransactions = transactions
+                  .where((t) => t.shopId == shopId)
+                  .toList()
+                  .reversed
+                  .take(3)
+                  .toList();
+
+              return Card(
+                elevation: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   children: [
-                    Text(
-                      'كريدي $shopName',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(context).colorScheme.primary,
+                            const Color(0xFF003366),
+                          ],
+                        ),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'كريدي $shopName',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            '${balance.toStringAsFixed(2)} درهم',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      '${balance.toStringAsFixed(2)} درهم',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'آخر العمليات مع هذا المحل:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          if (shopTransactions.isEmpty)
+                            const Text('لا توجد عمليات سابقة.')
+                          else
+                            ...shopTransactions.map(
+                              (tx) => ListTile(
+                                dense: true,
+                                leading: const Icon(
+                                  Icons.shopping_bag,
+                                  size: 20,
+                                ),
+                                title: Text(
+                                  '${tx.totalAmount.toStringAsFixed(2)} درهم',
+                                ),
+                                subtitle: Text(
+                                  tx.date.toString().substring(0, 16),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -88,29 +139,6 @@ class CustomerDashboard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            const Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'آخر العمليات',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (transactions.isEmpty)
-              const Text('لا توجد عمليات سابقة.')
-            else
-              ...transactions.reversed.take(10).map((tx) {
-                final shop = appState.getShopById(tx.shopId);
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.shopping_bag),
-                    title: Text('${tx.totalAmount.toStringAsFixed(2)} درهم'),
-                    subtitle: Text(
-                      '${shop?.name ?? ''} - ${tx.date.toString().substring(0, 16)}',
-                    ),
-                  ),
-                );
-              }),
           ],
         ),
       ),
