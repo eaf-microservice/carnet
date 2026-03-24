@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1062617118772",
+    "project_id": "konach-hanot",
+    "storage_bucket": "konach-hanot.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1062617118772:android:b3cdc99c0d8d4e51f7f261",
+        "android_client_info": {
+          "package_name": "com.eafmicroservice.carnet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfTwIRvemjPXwjZr_dldYZnm9HHsw9qB8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
