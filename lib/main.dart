@@ -99,11 +99,25 @@ final _router = GoRouter(
       },
     ),
     GoRoute(path: '/owner/qr', builder: (context, state) => ShopQRCodeScreen()),
+    GoRoute(path: '/owner/merchant-qr', builder: (context, state) => MerchantQRCodeScreen()),
+    GoRoute(path: '/owner/merchants', builder: (context, state) => ManageMerchantsScreen()),
+    GoRoute(path: '/owner/join-shop', builder: (context, state) => JoinShopScreen()),
+    GoRoute(
+        path: '/owner/shelves',
+        builder: (context, state) => ManageShelvesScreen()),
 
     // Customer Routes
     GoRoute(
       path: '/customer/scan',
       builder: (context, state) => ScanQRCodeScreen(),
+    ),
+    GoRoute(
+      path: '/customer/add/:shopId/:customerId',
+      builder: (context, state) {
+        final shopId = state.pathParameters['shopId']!;
+        final customerId = state.pathParameters['customerId'];
+        return AddPurchaseScreen(shopId: shopId, customerId: customerId);
+      },
     ),
     GoRoute(
       path: '/customer/add/:shopId',

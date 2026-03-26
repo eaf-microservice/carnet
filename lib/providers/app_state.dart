@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:async';
 import '../models/models.dart';
 
@@ -45,11 +46,19 @@ class AppState extends ChangeNotifier {
   void _startSubscriptions() {
     _cancelSubscriptions();
 
-    // Sync Users
+    // Sync Users — also keep _currentUser fresh in real-time
     _usersSub = _firestore.collection('users').snapshots().listen((snap) {
       _allUsers = snap.docs.map((doc) => AppUser.fromMap(doc.data())).toList();
+      // Keep _currentUser in sync with its Firestore document
+      if (_currentUser != null) {
+        final updated = _allUsers.cast<AppUser?>().firstWhere(
+          (u) => u?.id == _currentUser!.id,
+          orElse: () => null,
+        );
+        if (updated != null) _currentUser = updated;
+      }
       notifyListeners();
-    });
+    }, onError: (e) => debugPrint('Error fetching users: $e'));
 
     // Sync Items
     _itemsSub = _firestore.collection('items').snapshots().listen((snap) {
@@ -57,7 +66,7 @@ class AppState extends ChangeNotifier {
           .map((doc) => LedgerItem.fromMap(doc.data()))
           .toList();
       notifyListeners();
-    });
+    }, onError: (e) => debugPrint('Error fetching items: $e'));
 
     // Sync Transactions
     _txSub = _firestore.collection('transactions').snapshots().listen((snap) {
@@ -65,14 +74,25 @@ class AppState extends ChangeNotifier {
           .map((doc) => LedgerTransaction.fromMap(doc.data()))
           .toList();
       notifyListeners();
-    });
+    }, onError: (e) => debugPrint('Error fetching transactions: $e'));
   }
 
   Future<void> _fetchCurrentUser(String uid) async {
-    final doc = await _firestore.collection('users').doc(uid).get();
-    if (doc.exists) {
-      _currentUser = AppUser.fromMap(doc.data()!);
-      notifyListeners();
+    try {
+      debugPrint('Fetching user data for: $uid');
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        debugPrint('User data found: $data');
+        _currentUser = AppUser.fromMap(data);
+        debugPrint('AppUser object created for: ${_currentUser?.name}');
+        notifyListeners();
+      } else {
+        debugPrint('User document does not exist in Firestore for: $uid');
+      }
+    } catch (e, stack) {
+      debugPrint('CRITICAL ERROR fetching current user: $e');
+      debugPrint(stack.toString());
     }
   }
 
@@ -117,7 +137,12 @@ class AppState extends ChangeNotifier {
       email: email,
       password: password,
     );
-    final user = AppUser(id: cred.user!.uid, name: name, role: role);
+    final user = AppUser(
+      id: cred.user!.uid,
+      name: name,
+      role: role,
+      shopId: role == UserRole.shopOwner ? cred.user!.uid : null,
+    );
     await _firestore.collection('users').doc(user.id).set(user.toMap());
   }
 
@@ -154,6 +179,61 @@ class AppState extends ChangeNotifier {
     await _googleSignIn.signOut();
   }
 
+  Future<void> addManualCustomer(String name, String shopId) async {
+    // Generate a unique ID for the manual customer
+    final customerId = 'manual_${const Uuid().v4()}';
+    final customer = AppUser(
+      id: customerId,
+      name: name,
+      role: UserRole.customer,
+      shopBalances: {shopId: 0.0},
+    );
+    
+    await _firestore.collection('users').doc(customerId).set(customer.toMap());
+  }
+
+  Future<void> linkManualCustomerToReal(
+    String manualId,
+    String realId,
+    String shopId,
+  ) async {
+    // 1. Get manual customer data
+    final manualCustomer = getCustomerById(manualId);
+    if (manualCustomer == null) return;
+
+    final balance = manualCustomer.shopBalances[shopId] ?? 0;
+
+    // 2. Update real user's balance
+    final realUserRef = _firestore.collection('users').doc(realId);
+    final realUserDoc = await realUserRef.get();
+    if (realUserDoc.exists) {
+      final realUser = AppUser.fromMap(realUserDoc.data()!);
+      Map<String, double> newBalances = Map.of(realUser.shopBalances);
+      newBalances[shopId] = (newBalances[shopId] ?? 0) + balance;
+
+      await realUserRef.update({
+        'shopBalances': newBalances,
+      });
+    }
+
+    // 3. Migrate transactions
+    final txQuery = await _firestore
+        .collection('transactions')
+        .where('customerId', isEqualTo: manualId)
+        .where('shopId', isEqualTo: shopId)
+        .get();
+
+    final batch = _firestore.batch();
+    for (var doc in txQuery.docs) {
+      batch.update(doc.reference, {'customerId': realId});
+    }
+
+    // 4. Delete manual customer
+    batch.delete(_firestore.collection('users').doc(manualId));
+
+    await batch.commit();
+  }
+
   Future<void> linkCustomerToShop(String customerId, String shopId) async {
     final customer = getCustomerById(customerId);
     if (customer != null && !customer.shopBalances.containsKey(shopId)) {
@@ -173,23 +253,67 @@ class AppState extends ChangeNotifier {
     final customer = getCustomerById(customerId);
     if (customer == null) return;
 
-    double total = items.fold(0, (sum, item) => sum + item.price);
-    final tx = LedgerTransaction(
-      customerId: customerId,
-      shopId: shopId,
-      items: items,
-      totalAmount: total,
-      date: DateTime.now(),
+    // ignore: avoid_types_as_parameter_names
+    double total = items.fold(0.0, (sum, item) => sum + (item.price * item.quantite));
+    
+    debugPrint('Saving purchase for $customerId in shop $shopId. Total: $total');
+    
+    try {
+      final tx = LedgerTransaction(
+        customerId: customerId,
+        shopId: shopId,
+        merchantId: _currentUser?.id,
+        items: items,
+        totalAmount: total,
+        date: DateTime.now(),
+      );
+
+      await _firestore.collection('transactions').doc(tx.id).set(tx.toMap());
+      debugPrint('Transaction saved: ${tx.id}');
+
+      // Update balance
+      customer.shopBalances[shopId] = (customer.shopBalances[shopId] ?? 0) + total;
+      await _firestore.collection('users').doc(customerId).update({
+        'shopBalances': customer.shopBalances,
+      });
+      debugPrint('Balance updated in Firestore for $customerId');
+    } catch (e, stack) {
+      debugPrint('ERROR in addPurchase saving to Firestore: $e');
+      debugPrint(stack.toString());
+    }
+  }
+
+  Future<void> addItemToShop(LedgerItem item) async {
+    final ownerShopId = _currentUser?.shopId;
+    if (ownerShopId == null) {
+      debugPrint('ERROR: addItemToShop failed because ownerShopId is null. CurrentUser: ${_currentUser?.id}, Role: ${_currentUser?.role}');
+      return;
+    }
+
+    final newItem = LedgerItem(
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      quantite: item.quantite,
+      iconName: item.iconName,
+      shopId: ownerShopId,
     );
 
-    await _firestore.collection('transactions').doc(tx.id).set(tx.toMap());
+    debugPrint('Adding item to shop shelf: ${newItem.name}');
+    try {
+      await _firestore.collection('items').doc(newItem.id).set(newItem.toMap());
+      debugPrint('Item saved successfully: ${newItem.id}');
+    } catch (e) {
+      debugPrint('Error saving item: $e');
+    }
+  }
 
-    // Update balance
-    customer.shopBalances[shopId] =
-        (customer.shopBalances[shopId] ?? 0) + total;
-    await _firestore.collection('users').doc(customerId).update({
-      'shopBalances': customer.shopBalances,
-    });
+  Future<void> removeItemFromShop(String itemId) async {
+    await _firestore.collection('items').doc(itemId).delete();
+  }
+
+  List<LedgerItem> getItemsForShop(String shopId) {
+    return _availableItems.where((i) => i.shopId == shopId || i.shopId == null).toList();
   }
 
   Future<void> deleteTransaction(String transactionId) async {
@@ -202,8 +326,9 @@ class AppState extends ChangeNotifier {
     if (customer != null) {
       customer.shopBalances[tx.shopId] =
           (customer.shopBalances[tx.shopId] ?? 0) - tx.totalAmount;
-      if (customer.shopBalances[tx.shopId]! < 0)
+      if (customer.shopBalances[tx.shopId]! < 0) {
         customer.shopBalances[tx.shopId] = 0;
+      }
 
       await _firestore.collection('users').doc(tx.customerId).update({
         'shopBalances': customer.shopBalances,
@@ -227,17 +352,21 @@ class AppState extends ChangeNotifier {
     if (itemIndex == -1) return;
 
     final oldItem = tx.items[itemIndex];
-    final priceDiff = newPrice - oldItem.price;
 
     final newItem = LedgerItem(
       id: oldItem.id,
       name: oldItem.name,
       price: newPrice,
+      quantite: oldItem.quantite,
       iconName: oldItem.iconName,
     );
 
+    // Update local copy
     tx.items[itemIndex] = newItem;
-    final newTotal = tx.totalAmount + priceDiff;
+    
+    // Recalculate total from scratch for safety
+    final newTotal = tx.items.fold(0.0, (sum, item) => sum + (item.price * item.quantite));
+    final totalDiff = newTotal - tx.totalAmount;
 
     await _firestore.collection('transactions').doc(transactionId).update({
       'items': tx.items.map((i) => i.toMap()).toList(),
@@ -246,11 +375,55 @@ class AppState extends ChangeNotifier {
 
     final customer = getCustomerById(tx.customerId);
     if (customer != null) {
-      customer.shopBalances[tx.shopId] =
-          (customer.shopBalances[tx.shopId] ?? 0) + priceDiff;
+      customer.shopBalances[tx.shopId] = (customer.shopBalances[tx.shopId] ?? 0) + totalDiff;
       await _firestore.collection('users').doc(tx.customerId).update({
         'shopBalances': customer.shopBalances,
       });
     }
+  }
+
+  Future<void> linkMerchantToShop(String userId, String shopId) async {
+    final userRef = _firestore.collection('users').doc(userId);
+    await userRef.update({
+      'shopId': shopId,
+      'role': UserRole.shopOwner.name,
+    });
+  }
+
+  /// Returns all users who are co-merchants of a given shop (excluding the original owner).
+  List<AppUser> getMerchantsForShop(String shopId, String ownerId) {
+    return _allUsers
+        .where((u) =>
+            u.shopId == shopId &&
+            u.role == UserRole.shopOwner &&
+            u.id != ownerId)
+        .toList();
+  }
+
+  /// Revokes a merchant's access to the shop.
+  Future<void> revokeMerchantFromShop(String userId) async {
+    await _firestore.collection('users').doc(userId).update({
+      'shopId': null,
+      'role': UserRole.customer.name,
+    });
+  }
+
+  /// Transfers full shop ownership to another user.
+  /// The new owner gets the shopId; the old owner loses it.
+  Future<void> transferShopOwnership(String newOwnerId, String shopId) async {
+    final batch = _firestore.batch();
+    // New owner gets the shop
+    batch.update(_firestore.collection('users').doc(newOwnerId), {
+      'shopId': shopId,
+      'role': UserRole.shopOwner.name,
+    });
+    // Old owner is demoted (keep as customer)
+    if (_currentUser != null && _currentUser!.id != newOwnerId) {
+      batch.update(_firestore.collection('users').doc(_currentUser!.id), {
+        'shopId': null,
+        'role': UserRole.customer.name,
+      });
+    }
+    await batch.commit();
   }
 }

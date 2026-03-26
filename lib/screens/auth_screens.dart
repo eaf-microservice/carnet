@@ -5,6 +5,8 @@ import '../providers/app_state.dart';
 import '../models/models.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -140,18 +142,48 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   UserRole _selectedRole = UserRole.customer;
   bool _isLoading = false;
 
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'يرجى إدخال كلمة المرور';
+    }
+    if (value.length < 8) {
+      return 'يجب أن تكون كلمة المرور 8 أحرف على الأقل';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'يجب أن تحتوي على حرف كبير واحد على الأقل';
+    }
+    if (!RegExp(r'[a-z]').hasMatch(value)) {
+      return 'يجب أن تحتوي على حرف صغير واحد على الأقل';
+    }
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'يجب أن تحتوي على رقم واحد على الأقل';
+    }
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
+      return 'يجب أن تحتوي على رمز خاص واحد على الأقل';
+    }
+    return null;
+  }
+
   Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       await context.read<AppState>().register(
@@ -178,61 +210,114 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(title: const Text('إنشاء حساب جديد')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'الاسم الكامل'),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'البريد الإلكتروني'),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'كلمة المرور'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'اختر نوع الحساب:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: RadioListTile<UserRole>(
-                    title: const Text('زبون'),
-                    value: UserRole.customer,
-                    groupValue: _selectedRole,
-                    onChanged: (v) => setState(() => _selectedRole = v!),
-                  ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'الاسم الكامل',
+                  border: OutlineInputBorder(),
                 ),
-                Expanded(
-                  child: RadioListTile<UserRole>(
-                    title: const Text('صاحب محل'),
-                    value: UserRole.shopOwner,
-                    groupValue: _selectedRole,
-                    onChanged: (v) => setState(() => _selectedRole = v!),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _register,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'يرجى إدخال الاسم الكامل';
+                  }
+                  return null;
+                },
               ),
-              child: _isLoading
-                  ? const CircularProgressIndicator()
-                  : const Text('إنشاء الحساب وتفعيل الكناش'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'البريد الإلكتروني',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'يرجى إدخال البريد الإلكتروني';
+                  }
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    return 'يرجى إدخال بريد إلكتروني صحيح';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'كلمة المرور',
+                  border: OutlineInputBorder(),
+                  helperText: 'يجب أن تكون قوية (الأحرف، الأرقام والرموز)',
+                ),
+                obscureText: true,
+                validator: _validatePassword,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmPasswordController,
+                decoration: const InputDecoration(
+                  labelText: 'تأكيد كلمة المرور',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'يرجى تأكيد كلمة المرور';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'كلمات المرور غير متطابقة';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'اختر نوع الحساب:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<UserRole>(
+                      title: const Text('زبون'),
+                      value: UserRole.customer,
+                      groupValue: _selectedRole,
+                      onChanged: (v) => setState(() => _selectedRole = v!),
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<UserRole>(
+                      title: const Text('صاحب محل'),
+                      value: UserRole.shopOwner,
+                      groupValue: _selectedRole,
+                      onChanged: (v) => setState(() => _selectedRole = v!),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _register,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text(
+                        'إنشاء الحساب وتفعيل الكناش',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

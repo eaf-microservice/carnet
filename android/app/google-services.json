@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "1062617118772",
+    "firebase_url": "https://konach-hanot-default-rtdb.firebaseio.com",
     "project_id": "konach-hanot",
     "storage_bucket": "konach-hanot.firebasestorage.app"
   },
@@ -12,7 +13,20 @@
           "package_name": "com.eafmicroservice.carnet"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1062617118772-qrrs7h1fqjk4art69qh5n5ue1akfeq36.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.eafmicroservice.carnet",
+            "certificate_hash": "0fb6d2341275a0bf72693e9cb6cc29de0c6b9f21"
+          }
+        },
+        {
+          "client_id": "1062617118772-hs0bu2lnt6s7t33to3og2lbivc38juru.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBfTwIRvemjPXwjZr_dldYZnm9HHsw9qB8"
@@ -20,7 +34,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1062617118772-hs0bu2lnt6s7t33to3og2lbivc38juru.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
