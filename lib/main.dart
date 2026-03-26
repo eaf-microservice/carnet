@@ -9,6 +9,7 @@ import 'providers/app_state.dart';
 import 'screens/auth_screens.dart';
 import 'screens/owner_screens.dart';
 import 'screens/customer_screens.dart';
+import 'screens/profile_screen.dart';
 import 'models/models.dart';
 
 void main() async {
@@ -39,7 +40,8 @@ class CarnetApp extends StatelessWidget {
     );
 
     return MaterialApp.router(
-      title: 'Carnet - كناش مول الحانوت',
+      debugShowCheckedModeBanner: false,
+      title: 'Carnet credit - كناش الكريدي',
       themeMode: ThemeMode.light,
       theme: ThemeData(
         useMaterial3: true,
@@ -76,7 +78,21 @@ final _router = GoRouter(
         if (!appState.isLoggedIn) {
           return LoginScreen();
         }
-        if (appState.currentUser?.role == UserRole.shopOwner) {
+
+        if (!appState.isEmailVerified) {
+          return const EmailVerificationScreen();
+        }
+
+        if (appState.needsRoleSelection) {
+          return const ChooseRoleScreen();
+        }
+
+        final user = appState.currentUser;
+        if (user != null && user.isDeactivated) {
+          return const DeactivatedAccountScreen();
+        }
+
+        if (user?.role == UserRole.shopOwner) {
           return OwnerDashboard();
         } else {
           return CustomerDashboard();
@@ -85,8 +101,17 @@ final _router = GoRouter(
     ),
     GoRoute(path: '/login', builder: (context, state) => LoginScreen()),
     GoRoute(path: '/register', builder: (context, state) => RegisterScreen()),
+    GoRoute(
+      path: '/verify',
+      builder: (context, state) => const EmailVerificationScreen(),
+    ),
+    GoRoute(
+      path: '/profile',
+      builder: (context, state) => const ProfileScreen(),
+    ),
 
     // Owner Routes
+    GoRoute(path: '/owner', builder: (context, state) => OwnerDashboard()),
     GoRoute(
       path: '/owner/customers',
       builder: (context, state) => CustomerList(),
@@ -99,14 +124,28 @@ final _router = GoRouter(
       },
     ),
     GoRoute(path: '/owner/qr', builder: (context, state) => ShopQRCodeScreen()),
-    GoRoute(path: '/owner/merchant-qr', builder: (context, state) => MerchantQRCodeScreen()),
-    GoRoute(path: '/owner/merchants', builder: (context, state) => ManageMerchantsScreen()),
-    GoRoute(path: '/owner/join-shop', builder: (context, state) => JoinShopScreen()),
     GoRoute(
-        path: '/owner/shelves',
-        builder: (context, state) => ManageShelvesScreen()),
+      path: '/owner/merchant-qr',
+      builder: (context, state) => MerchantQRCodeScreen(),
+    ),
+    GoRoute(
+      path: '/owner/merchants',
+      builder: (context, state) => ManageMerchantsScreen(),
+    ),
+    GoRoute(
+      path: '/owner/join-shop',
+      builder: (context, state) => JoinShopScreen(),
+    ),
+    GoRoute(
+      path: '/owner/shelves',
+      builder: (context, state) => ManageShelvesScreen(),
+    ),
 
     // Customer Routes
+    GoRoute(
+      path: '/customer',
+      builder: (context, state) => CustomerDashboard(),
+    ),
     GoRoute(
       path: '/customer/scan',
       builder: (context, state) => ScanQRCodeScreen(),
@@ -127,8 +166,4 @@ final _router = GoRouter(
       },
     ),
   ],
-  redirect: (context, state) {
-    // Optional: Add global auth redirect logic here.
-    return null;
-  },
 );

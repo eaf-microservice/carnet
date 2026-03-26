@@ -15,11 +15,27 @@
       },
       "oauth_client": [
         {
+          "client_id": "1062617118772-h1rhdfi6b6bje89v6f1pf3ejr0ossi2n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.eafmicroservice.carnet",
+            "certificate_hash": "fdd3ace03e788eca623f07aed6579658847e2e49"
+          }
+        },
+        {
           "client_id": "1062617118772-qrrs7h1fqjk4art69qh5n5ue1akfeq36.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.eafmicroservice.carnet",
             "certificate_hash": "0fb6d2341275a0bf72693e9cb6cc29de0c6b9f21"
+          }
+        },
+        {
+          "client_id": "1062617118772-uglonavglq9jr2arpmggpnda6es7tpqi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.eafmicroservice.carnet",
+            "certificate_hash": "3a8ac26f178d2b9f95c085e09d56b2dcea77d5da"
           }
         },
         {

@@ -9,12 +9,16 @@ import '../models/models.dart';
 class AppState extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '1062617118772-hs0bu2lnt6s7t33to3og2lbivc38juru.apps.googleusercontent.com',
+  );
 
   AppUser? _currentUser;
+  bool _needsRoleSelection = false;
   List<AppUser> _allUsers = [];
   List<LedgerItem> _availableItems = [];
   List<LedgerTransaction> _transactions = [];
+  CurrencyMode _currencyMode = CurrencyMode.dirham;
 
   StreamSubscription? _usersSub;
   StreamSubscription? _itemsSub;
@@ -98,7 +102,7 @@ class AppState extends ChangeNotifier {
 
   // Getters
   AppUser? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser != null;
+  bool get needsRoleSelection => _needsRoleSelection;
 
   List<AppUser> getCustomersForShop(String shopId) {
     return _allUsers
@@ -111,6 +115,33 @@ class AppState extends ChangeNotifier {
 
   List<LedgerItem> get availableItems => _availableItems;
   List<LedgerTransaction> get transactions => [..._transactions];
+  bool get isLoggedIn => _auth.currentUser != null;
+  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
+  CurrencyMode get currencyMode => _currentUser?.currencyMode ?? _currencyMode;
+
+  Future<void> setCurrencyMode(CurrencyMode mode) async {
+    _currencyMode = mode;
+    if (_currentUser != null) {
+      await _firestore.collection('users').doc(_currentUser!.id).update({
+        'currencyMode': mode.name,
+      });
+    }
+    notifyListeners();
+  }
+
+  String formatCurrency(double amount) {
+    if (currencyMode == CurrencyMode.rial) {
+      return '${(amount * 20).toStringAsFixed(0)} ريال';
+    }
+    return '${amount.toStringAsFixed(2)} درهم';
+  }
+
+  double convertToDirham(double value) {
+    if (currencyMode == CurrencyMode.rial) {
+      return value / 20.0;
+    }
+    return value;
+  }
 
   AppUser? getCustomerById(String id) => _allUsers.cast<AppUser?>().firstWhere(
     (u) => u?.id == id,
@@ -131,19 +162,36 @@ class AppState extends ChangeNotifier {
     String email,
     String password,
     String name,
-    UserRole role,
-  ) async {
+    UserRole role, {
+    String? phone,
+    String? address,
+  }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
+    
+    // Send verification email
+    await cred.user!.sendEmailVerification();
+
     final user = AppUser(
       id: cred.user!.uid,
       name: name,
       role: role,
+      phone: phone,
+      address: address,
       shopId: role == UserRole.shopOwner ? cred.user!.uid : null,
     );
     await _firestore.collection('users').doc(user.id).set(user.toMap());
+  }
+
+  Future<void> reloadUser() async {
+    await _auth.currentUser?.reload();
+    notifyListeners();
+  }
+
+  Future<void> resendVerificationEmail() async {
+    await _auth.currentUser?.sendEmailVerification();
   }
 
   Future<void> login(String email, String password) async {
@@ -161,17 +209,64 @@ class AppState extends ChangeNotifier {
     );
 
     final cred = await _auth.signInWithCredential(credential);
+    final userUid = cred.user!.uid;
 
-    // Check if user exists in Firestore, if not create
-    final doc = await _firestore.collection('users').doc(cred.user!.uid).get();
+    // Check if user exists in Firestore
+    final doc = await _firestore.collection('users').doc(userUid).get();
     if (!doc.exists) {
-      final newUser = AppUser(
-        id: cred.user!.uid,
-        name: googleUser.displayName ?? 'مستخدم جوجل',
-        role: UserRole.customer, // Default to customer
-      );
-      await _firestore.collection('users').doc(newUser.id).set(newUser.toMap());
+      _needsRoleSelection = true;
+      notifyListeners();
+    } else {
+      _needsRoleSelection = false;
+      await _fetchCurrentUser(userUid);
     }
+  }
+
+  Future<void> completeGoogleSignIn(UserRole role) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final newUser = AppUser(
+      id: user.uid,
+      name: user.displayName ?? 'مستخدم جوجل',
+      role: role,
+      phone: user.phoneNumber, // Capture phone from Google/Firebase if available
+      shopId: role == UserRole.shopOwner ? user.uid : null,
+      profileImageUrl: user.photoURL,
+    );
+
+    await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+    _needsRoleSelection = false;
+    await _fetchCurrentUser(user.uid);
+  }
+
+  Future<void> updateProfile({
+    String? name,
+    String? phone,
+    String? address,
+    String? profileImageUrl,
+  }) async {
+    if (_currentUser == null) return;
+
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (phone != null) updates['phone'] = phone;
+    if (address != null) updates['address'] = address;
+    if (profileImageUrl != null) updates['profileImageUrl'] = profileImageUrl;
+
+    if (updates.isEmpty) return;
+
+    await _firestore.collection('users').doc(_currentUser!.id).update(updates);
+    // Real-time listener will pick up the change and update _currentUser
+  }
+
+  Future<void> deactivateAccount() async {
+    if (_currentUser == null) return;
+
+    await _firestore.collection('users').doc(_currentUser!.id).update({
+      'isDeactivated': true,
+    });
+    await logout();
   }
 
   Future<void> logout() async {
@@ -179,17 +274,29 @@ class AppState extends ChangeNotifier {
     await _googleSignIn.signOut();
   }
 
-  Future<void> addManualCustomer(String name, String shopId) async {
+  Future<void> addManualCustomer(String name, String shopId, {String? nickname, String? phone}) async {
     // Generate a unique ID for the manual customer
     final customerId = 'manual_${const Uuid().v4()}';
     final customer = AppUser(
       id: customerId,
       name: name,
       role: UserRole.customer,
+      phone: phone,
       shopBalances: {shopId: 0.0},
+      shopNicknames: nickname != null ? {shopId: nickname} : {},
     );
     
     await _firestore.collection('users').doc(customerId).set(customer.toMap());
+  }
+
+  Future<void> setCustomerNickname(String customerId, String shopId, String nickname) async {
+    final customer = getCustomerById(customerId);
+    if (customer == null) return;
+
+    customer.shopNicknames[shopId] = nickname;
+    await _firestore.collection('users').doc(customerId).update({
+      'shopNicknames': customer.shopNicknames,
+    });
   }
 
   Future<void> linkManualCustomerToReal(
@@ -197,41 +304,42 @@ class AppState extends ChangeNotifier {
     String realId,
     String shopId,
   ) async {
-    // 1. Get manual customer data
-    final manualCustomer = getCustomerById(manualId);
-    if (manualCustomer == null) return;
+    final manualUser = getCustomerById(manualId);
+    final realUser = getCustomerById(realId);
 
-    final balance = manualCustomer.shopBalances[shopId] ?? 0;
+    if (manualUser == null || realUser == null) return;
 
-    // 2. Update real user's balance
-    final realUserRef = _firestore.collection('users').doc(realId);
-    final realUserDoc = await realUserRef.get();
-    if (realUserDoc.exists) {
-      final realUser = AppUser.fromMap(realUserDoc.data()!);
-      Map<String, double> newBalances = Map.of(realUser.shopBalances);
-      newBalances[shopId] = (newBalances[shopId] ?? 0) + balance;
+    final batch = _firestore.batch();
 
-      await realUserRef.update({
-        'shopBalances': newBalances,
-      });
-    }
+    // 1. Move balance
+    final manualBalance = manualUser.shopBalances[shopId] ?? 0.0;
+    realUser.shopBalances[shopId] =
+        (realUser.shopBalances[shopId] ?? 0.0) + manualBalance;
 
-    // 3. Migrate transactions
-    final txQuery = await _firestore
+    // 2. Set the manual name as nickname for the real user
+    realUser.shopNicknames[shopId] = manualUser.name;
+
+    batch.update(_firestore.collection('users').doc(realId), {
+      'shopBalances': realUser.shopBalances,
+      'shopNicknames': realUser.shopNicknames,
+    });
+
+    // 3. Update all transactions from manualId to realId for this shop
+    final txDocs = await _firestore
         .collection('transactions')
         .where('customerId', isEqualTo: manualId)
         .where('shopId', isEqualTo: shopId)
         .get();
 
-    final batch = _firestore.batch();
-    for (var doc in txQuery.docs) {
+    for (final doc in txDocs.docs) {
       batch.update(doc.reference, {'customerId': realId});
     }
 
-    // 4. Delete manual customer
+    // 4. Delete manual user
     batch.delete(_firestore.collection('users').doc(manualId));
 
     await batch.commit();
+    // No need to manually refresh, snapshots will handle it.
   }
 
   Future<void> linkCustomerToShop(String customerId, String shopId) async {

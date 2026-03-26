@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/app_state.dart';
 import '../models/models.dart';
+import '../widgets/app_drawer.dart';
 
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key});
@@ -36,16 +37,8 @@ class OwnerDashboard extends StatelessWidget {
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await appState.logout();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-        ],
       ),
+      drawer: const AppDrawer(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -80,16 +73,16 @@ class OwnerDashboard extends StatelessWidget {
                   Text(
                     'مجموع الكريدي',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withOpacity(0.8),
                       fontSize: 14,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${totalDebt.toStringAsFixed(2)} درهم',
+                    appState.formatCurrency(totalDebt),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 36,
+                      fontSize: 32,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -98,68 +91,9 @@ class OwnerDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Actions
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                SizedBox(
-                  width: (MediaQuery.of(context).size.width - 44) / 2,
-                  child: ElevatedButton.icon(
-                    onPressed: () => context.push('/owner/customers'),
-                    icon: const Icon(Icons.people),
-                    label: const Text('الكليان'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: (MediaQuery.of(context).size.width - 44) / 2,
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push('/owner/shelves'),
-                    icon: const Icon(Icons.shelves),
-                    label: const Text('الرفوف'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: (MediaQuery.of(context).size.width - 44) / 2,
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push('/owner/qr'),
-                    icon: const Icon(Icons.qr_code),
-                    label: const Text('كود المحل'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: (MediaQuery.of(context).size.width - 44) / 2,
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push('/owner/merchant-qr'),
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('دعوة تاجر'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: (MediaQuery.of(context).size.width - 44) / 2,
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push('/owner/join-shop'),
-                    icon: const Icon(Icons.store),
-                    label: const Text('انضمام لمحل'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 24),
+            // Removed Wrap of buttons since they are now in the Drawer
+
 
             const SizedBox(height: 32),
             Text(
@@ -175,17 +109,15 @@ class OwnerDashboard extends StatelessWidget {
                     child: ListTile(
                       leading: CircleAvatar(child: Text(customer.name[0])),
                       title: Text(
-                        customer.name,
+                        customer.shopNicknames[shopId] != null && customer.shopNicknames[shopId] != customer.name
+                            ? '${customer.shopNicknames[shopId]} (${customer.name})'
+                            : (customer.shopNicknames[shopId] ?? customer.name),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      trailing: Text(
-                        '${(customer.shopBalances[shopId] ?? 0).toStringAsFixed(2)} درهم',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      subtitle: customer.phone != null
+                          ? Text('${customer.phone!} • ${appState.formatCurrency(customer.shopBalances[shopId] ?? 0)}')
+                          : Text(appState.formatCurrency(customer.shopBalances[shopId] ?? 0)),
+                      trailing: const Icon(Icons.chevron_left),
                       onTap: () =>
                           context.push('/owner/customers/${customer.id}'),
                     ),
@@ -215,9 +147,20 @@ class CustomerList extends StatelessWidget {
           final customer = customers[index];
           return ListTile(
             leading: CircleAvatar(child: Text(customer.name[0])),
-            title: Text(customer.name),
-            subtitle: Text(
-              'الرصيد: ${(customer.shopBalances[shopId] ?? 0).toStringAsFixed(2)} درهم',
+            title: Text(
+              customer.shopNicknames[shopId] != null && customer.shopNicknames[shopId] != customer.name
+                  ? '${customer.shopNicknames[shopId]} (${customer.name})'
+                  : (customer.shopNicknames[shopId] ?? customer.name),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (customer.phone != null)
+                  Text('الهاتف: ${customer.phone}', style: const TextStyle(fontSize: 12)),
+                Text(
+                  'الرصيد: ${(customer.shopBalances[shopId] ?? 0).toStringAsFixed(2)} درهم',
+                ),
+              ],
             ),
             onTap: () => context.push('/owner/customers/${customer.id}'),
           );
@@ -225,18 +168,34 @@ class CustomerList extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          final controller = TextEditingController();
+          final nameController = TextEditingController();
+          final phoneController = TextEditingController();
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('إضافة زبون جديد'),
-              content: TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'اسم الزبون',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                   TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'اللقب (الاسم الذي تعرفه به)',
+                      border: OutlineInputBorder(),
+                      helperText: 'مثال: با لعروبي، الحسين الحلاق...',
+                    ),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: phoneController,
+                    decoration: const InputDecoration(
+                      labelText: 'رقم الهاتف (اختياري)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                ],
               ),
               actions: [
                 TextButton(
@@ -245,10 +204,14 @@ class CustomerList extends StatelessWidget {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (controller.text.trim().isNotEmpty) {
+                    final nickname = nameController.text.trim();
+                    final phone = phoneController.text.trim();
+                    if (nickname.isNotEmpty) {
                       context.read<AppState>().addManualCustomer(
-                        controller.text.trim(),
+                        nickname, // Using nickname as the initial name
                         shopId,
+                        nickname: nickname, // Also store it as a shop nickname
+                        phone: phone.isNotEmpty ? phone : null,
                       );
                       Navigator.pop(context);
                     }
@@ -270,6 +233,38 @@ class CustomerLedger extends StatelessWidget {
   final String customerId;
   const CustomerLedger({super.key, required this.customerId});
 
+  void _showEditNicknameDialog(BuildContext context, AppUser customer, String shopId) {
+    final appState = context.read<AppState>();
+    final controller = TextEditingController(text: customer.shopNicknames[shopId]);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تعديل لقب الزبون'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'اللقب المفضل',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              appState.setCustomerNickname(customer.id, shopId, controller.text.trim());
+              Navigator.pop(context);
+            },
+            child: const Text('تأكيد'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -280,8 +275,23 @@ class CustomerLedger extends StatelessWidget {
       return const Scaffold(body: Center(child: Text('غير موجود')));
     }
 
+    final shopId = appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
+    final nickname = customer.shopNicknames[shopId];
+    final displayName = nickname != null && nickname != customer.name
+        ? '$nickname (${customer.name})'
+        : (nickname ?? customer.name);
+
     return Scaffold(
-      appBar: AppBar(title: Text('حساب ${customer.name}')),
+      appBar: AppBar(
+        title: Text(displayName),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_note),
+            onPressed: () => _showEditNicknameDialog(context, customer, shopId),
+            tooltip: 'تعديل اللقب',
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Container(
@@ -363,7 +373,7 @@ class CustomerLedger extends StatelessWidget {
                               index]; // latest first
                       return ExpansionTile(
                         title: Text(
-                          'تقييد سلعة - ${tx.totalAmount.toStringAsFixed(2)} درهم',
+                          'تقييد سلعة - ${appState.formatCurrency(tx.totalAmount)}',
                         ),
                         subtitle: Text(tx.date.toString().substring(0, 16)),
                         trailing: Row(
@@ -407,7 +417,7 @@ class CustomerLedger extends StatelessWidget {
                               (item) => ListTile(
                                 title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                                 subtitle: Text(
-                                  '${item.quantite.toStringAsFixed(0)} وحدة × ${item.price.toStringAsFixed(2)} درهم',
+                                  '${item.quantite.toStringAsFixed(0)} وحدة × ${appState.formatCurrency(item.price)}',
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,

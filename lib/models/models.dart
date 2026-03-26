@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 enum UserRole { shopOwner, customer }
+enum CurrencyMode { dirham, rial }
 
 class AppUser {
   final String id;
@@ -8,7 +9,12 @@ class AppUser {
   final UserRole role;
   final String? shopId; // The shop they own or are connected to
   final String? profileImageUrl;
+  final String? phone;
+  final String? address;
+  final bool isDeactivated;
+  final CurrencyMode currencyMode;
   Map<String, double> shopBalances; // key: shopId, value: balance
+  Map<String, String> shopNicknames; // key: shopId, value: nickname assigned by merchant
 
   AppUser({
     required this.id,
@@ -16,8 +22,14 @@ class AppUser {
     required this.role,
     this.shopId,
     this.profileImageUrl,
+    this.phone,
+    this.address,
+    this.isDeactivated = false,
+    this.currencyMode = CurrencyMode.dirham,
     Map<String, double>? shopBalances,
-  }) : shopBalances = shopBalances ?? {};
+    Map<String, String>? shopNicknames,
+  })  : shopBalances = shopBalances ?? {},
+        shopNicknames = shopNicknames ?? {};
 
   Map<String, dynamic> toMap() {
     return {
@@ -26,7 +38,12 @@ class AppUser {
       'role': role.name,
       'shopId': shopId,
       'profileImageUrl': profileImageUrl,
+      'phone': phone,
+      'address': address,
+      'isDeactivated': isDeactivated,
+      'currencyMode': currencyMode.name,
       'shopBalances': shopBalances,
+      'shopNicknames': shopNicknames,
     };
   }
 
@@ -42,8 +59,17 @@ class AppUser {
       role: role,
       shopId: map['shopId'] ?? (role == UserRole.shopOwner ? id : null),
       profileImageUrl: map['profileImageUrl'],
+      phone: map['phone'],
+      address: map['address'],
+      isDeactivated: map['isDeactivated'] ?? false,
+      currencyMode: CurrencyMode.values.firstWhere(
+        (e) => e.name == map['currencyMode'],
+        orElse: () => CurrencyMode.dirham,
+      ),
       shopBalances: (map['shopBalances'] as Map<String, dynamic>? ?? {})
           .map((k, v) => MapEntry(k, (v as num).toDouble())),
+      shopNicknames: (map['shopNicknames'] as Map<String, dynamic>? ?? {})
+          .map((k, v) => MapEntry(k, v.toString())),
     );
   }
 }

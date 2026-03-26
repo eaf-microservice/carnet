@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/app_state.dart';
 import '../models/models.dart';
+import '../widgets/app_drawer.dart';
 
 class CustomerDashboard extends StatelessWidget {
   const CustomerDashboard({super.key});
@@ -24,16 +25,8 @@ class CustomerDashboard extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('مرحباً بك، ${user.name}'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await appState.logout();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-        ],
       ),
+      drawer: const AppDrawer(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -83,7 +76,7 @@ class CustomerDashboard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${balance.toStringAsFixed(2)} درهم',
+                            appState.formatCurrency(balance),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 32,
@@ -128,7 +121,7 @@ class CustomerDashboard extends StatelessWidget {
                                   size: 20,
                                 ),
                                 title: Text(
-                                  '${tx.totalAmount.toStringAsFixed(2)} درهم',
+                                  appState.formatCurrency(tx.totalAmount),
                                 ),
                                 subtitle: Text(
                                   tx.date.toString().substring(0, 16),
@@ -355,7 +348,8 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final availableItems = context.watch<AppState>().getItemsForShop(widget.shopId);
+    final appState = context.watch<AppState>();
+    final availableItems = appState.getItemsForShop(widget.shopId);
     final total = _selectedItems.fold(0.0, (sum, item) => sum + (item.price * item.quantite));
     final filteredItems = availableItems
         .where((i) => i.name.toLowerCase().contains(_searchQuery.toLowerCase()))
@@ -443,7 +437,13 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'اسم المنتج')),
-                                          TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الثمن (درهم)')),
+                                          TextField(
+                                            controller: priceCtrl,
+                                            keyboardType: TextInputType.number,
+                                            decoration: InputDecoration(
+                                              labelText: 'الثمن (${context.read<AppState>().currencyMode == CurrencyMode.rial ? 'بالريال' : 'بالدرهم'})',
+                                            ),
+                                          ),
                                           TextField(controller: qCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الكمية')),
                                         ],
                                       ),
@@ -455,7 +455,8 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                                             final p = double.tryParse(priceCtrl.text);
                                             final q = double.tryParse(qCtrl.text);
                                             if (name.isNotEmpty && p != null && q != null) {
-                                              _addItem(LedgerItem(name: name, price: p, quantite: q, iconName: 'shopping_cart'));
+                                              final actualPrice = appState.convertToDirham(p);
+                                              _addItem(LedgerItem(name: name, price: actualPrice, quantite: q, iconName: 'shopping_cart'));
                                               Navigator.pop(context);
                                             }
                                           },
@@ -515,7 +516,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                                       Icon(_getIconData(item.iconName), size: 28, color: Theme.of(context).colorScheme.primary),
                                       const SizedBox(height: 4),
                                       FittedBox(child: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold))),
-                                      Text('${item.price.toStringAsFixed(2)} درهم', style: const TextStyle(fontSize: 12)),
+                                      Text(appState.formatCurrency(item.price), style: const TextStyle(fontSize: 12)),
                                     ],
                                   ),
                                 ),
@@ -588,7 +589,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
-                                      '${(item.price * item.quantite).toStringAsFixed(2)} درهم',
+                                      appState.formatCurrency(item.price * item.quantite),
                                       style: TextStyle(
                                         color: Colors.blueGrey[700],
                                         fontSize: 11,
@@ -611,7 +612,7 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
                       const Text('المجموع:', style: TextStyle(fontSize: 12)),
                       FittedBox(
                         child: Text(
-                          '${total.toStringAsFixed(2)} درهم',
+                          appState.formatCurrency(total),
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
