@@ -76,7 +76,8 @@ class AppState extends ChangeNotifier {
     _txSub = _firestore.collection('transactions').snapshots().listen((snap) {
       _transactions = snap.docs
           .map((doc) => LedgerTransaction.fromMap(doc.data()))
-          .toList();
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
       notifyListeners();
     }, onError: (e) => debugPrint('Error fetching transactions: $e'));
   }
