@@ -92,9 +92,8 @@ class OwnerDashboard extends StatelessWidget {
             const SizedBox(height: 24),
 
             const SizedBox(height: 24),
+
             // Removed Wrap of buttons since they are now in the Drawer
-
-
             const SizedBox(height: 32),
             Text(
               'كليان بكريدي طالع',
@@ -107,16 +106,30 @@ class OwnerDashboard extends StatelessWidget {
                   (customer) => Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      leading: CircleAvatar(child: Text(customer.name[0])),
+                      leading: CircleAvatar(
+                        backgroundImage: customer.profileImageUrl != null
+                            ? NetworkImage(customer.profileImageUrl!)
+                            : null,
+                        child: customer.profileImageUrl == null
+                            ? Text(customer.name[0])
+                            : null,
+                      ),
                       title: Text(
-                        customer.shopNicknames[shopId] != null && customer.shopNicknames[shopId] != customer.name
+                        customer.shopNicknames[shopId] != null &&
+                                customer.shopNicknames[shopId] != customer.name
                             ? '${customer.shopNicknames[shopId]} (${customer.name})'
                             : (customer.shopNicknames[shopId] ?? customer.name),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       subtitle: customer.phone != null
-                          ? Text('${customer.phone!} • ${appState.formatCurrency(customer.shopBalances[shopId] ?? 0)}')
-                          : Text(appState.formatCurrency(customer.shopBalances[shopId] ?? 0)),
+                          ? Text(
+                              '${customer.phone!} • ${appState.formatCurrency(customer.shopBalances[shopId] ?? 0)}',
+                            )
+                          : Text(
+                              appState.formatCurrency(
+                                customer.shopBalances[shopId] ?? 0,
+                              ),
+                            ),
                       trailing: const Icon(Icons.chevron_left),
                       onTap: () =>
                           context.push('/owner/customers/${customer.id}'),
@@ -136,7 +149,8 @@ class CustomerList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    final shopId = appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
+    final shopId =
+        appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
     final customers = appState.getCustomersForShop(shopId);
 
     return Scaffold(
@@ -146,9 +160,17 @@ class CustomerList extends StatelessWidget {
         itemBuilder: (context, index) {
           final customer = customers[index];
           return ListTile(
-            leading: CircleAvatar(child: Text(customer.name[0])),
+            leading: CircleAvatar(
+              backgroundImage: customer.profileImageUrl != null
+                  ? NetworkImage(customer.profileImageUrl!)
+                  : null,
+              child: customer.profileImageUrl == null
+                  ? Text(customer.name[0])
+                  : null,
+            ),
             title: Text(
-              customer.shopNicknames[shopId] != null && customer.shopNicknames[shopId] != customer.name
+              customer.shopNicknames[shopId] != null &&
+                      customer.shopNicknames[shopId] != customer.name
                   ? '${customer.shopNicknames[shopId]} (${customer.name})'
                   : (customer.shopNicknames[shopId] ?? customer.name),
             ),
@@ -156,7 +178,10 @@ class CustomerList extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (customer.phone != null)
-                  Text('الهاتف: ${customer.phone}', style: const TextStyle(fontSize: 12)),
+                  Text(
+                    'الهاتف: ${customer.phone}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 Text(
                   'الرصيد: ${(customer.shopBalances[shopId] ?? 0).toStringAsFixed(2)} درهم',
                 ),
@@ -177,7 +202,7 @@ class CustomerList extends StatelessWidget {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                   TextField(
+                  TextField(
                     controller: nameController,
                     decoration: const InputDecoration(
                       labelText: 'اللقب (الاسم الذي تعرفه به)',
@@ -233,9 +258,15 @@ class CustomerLedger extends StatelessWidget {
   final String customerId;
   const CustomerLedger({super.key, required this.customerId});
 
-  void _showEditNicknameDialog(BuildContext context, AppUser customer, String shopId) {
+  void _showEditNicknameDialog(
+    BuildContext context,
+    AppUser customer,
+    String shopId,
+  ) {
     final appState = context.read<AppState>();
-    final controller = TextEditingController(text: customer.shopNicknames[shopId]);
+    final controller = TextEditingController(
+      text: customer.shopNicknames[shopId],
+    );
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -255,7 +286,11 @@ class CustomerLedger extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              appState.setCustomerNickname(customer.id, shopId, controller.text.trim());
+              appState.setCustomerNickname(
+                customer.id,
+                shopId,
+                controller.text.trim(),
+              );
               Navigator.pop(context);
             },
             child: const Text('تأكيد'),
@@ -265,7 +300,11 @@ class CustomerLedger extends StatelessWidget {
     );
   }
 
-  void _showRecordPaymentDialog(BuildContext context, String customerId, String shopId) {
+  void _showRecordPaymentDialog(
+    BuildContext context,
+    String customerId,
+    String shopId,
+  ) {
     final appState = context.read<AppState>();
     final controller = TextEditingController();
     showDialog(
@@ -295,7 +334,10 @@ class CustomerLedger extends StatelessWidget {
                 Navigator.pop(context);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('تسجيل الخلاص'),
           ),
         ],
@@ -313,7 +355,8 @@ class CustomerLedger extends StatelessWidget {
       return const Scaffold(body: Center(child: Text('غير موجود')));
     }
 
-    final shopId = appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
+    final shopId =
+        appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
     final nickname = customer.shopNicknames[shopId];
     final displayName = nickname != null && nickname != customer.name
         ? '$nickname (${customer.name})'
@@ -350,7 +393,10 @@ class CustomerLedger extends StatelessWidget {
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () {
-                      final shopId = appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
+                      final shopId =
+                          appState.currentUser?.shopId ??
+                          appState.currentUser?.id ??
+                          'shop_1';
                       final linkData = 'link:$shopId:${customer.id}';
                       showDialog(
                         context: context,
@@ -400,7 +446,8 @@ class CustomerLedger extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () => _showRecordPaymentDialog(context, customerId, shopId),
+                      onPressed: () =>
+                          _showRecordPaymentDialog(context, customerId, shopId),
                       icon: const Icon(Icons.payments),
                       label: const Text('تسديد خلاص'),
                       style: ElevatedButton.styleFrom(
@@ -424,7 +471,7 @@ class CustomerLedger extends StatelessWidget {
                           transactions[transactions.length -
                               1 -
                               index]; // latest first
-                      
+
                       if (tx.isPayment) {
                         return ListTile(
                           leading: const CircleAvatar(
@@ -451,7 +498,10 @@ class CustomerLedger extends StatelessWidget {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
                                 onPressed: () {
                                   showDialog(
                                     context: context,
@@ -462,7 +512,8 @@ class CustomerLedger extends StatelessWidget {
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
                                           child: const Text('إلغاء'),
                                         ),
                                         TextButton(
@@ -529,7 +580,12 @@ class CustomerLedger extends StatelessWidget {
                         children: tx.items
                             .map(
                               (item) => ListTile(
-                                title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                title: Text(
+                                  item.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 subtitle: Text(
                                   '${item.quantite.toStringAsFixed(0)} وحدة × ${appState.formatCurrency(item.price)}',
                                 ),
@@ -538,7 +594,9 @@ class CustomerLedger extends StatelessWidget {
                                   children: [
                                     Text(
                                       '${(item.price * item.quantite).toStringAsFixed(2)} درهم',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.edit, size: 20),
@@ -550,7 +608,9 @@ class CustomerLedger extends StatelessWidget {
                                         showDialog(
                                           context: context,
                                           builder: (context) => AlertDialog(
-                                            title: const Text('تعديل الثمن للقطعة'),
+                                            title: const Text(
+                                              'تعديل الثمن للقطعة',
+                                            ),
                                             content: TextField(
                                               controller: controller,
                                               keyboardType:
@@ -602,7 +662,10 @@ class CustomerLedger extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          final shopId = appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
+          final shopId =
+              appState.currentUser?.shopId ??
+              appState.currentUser?.id ??
+              'shop_1';
           context.push('/customer/add/$shopId/$customerId');
         },
         label: const Text('إضافة للكريدي'),
@@ -618,7 +681,8 @@ class ShopQRCodeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    final shopId = appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
+    final shopId =
+        appState.currentUser?.shopId ?? appState.currentUser?.id ?? 'shop_1';
 
     return Scaffold(
       appBar: AppBar(title: const Text('كود المحل')),
@@ -649,7 +713,10 @@ class ShopQRCodeScreen extends StatelessWidget {
             const SizedBox(height: 32),
             Text(
               'الرمز الخاص بمحلك: $shopId',
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
             ),
             const SizedBox(height: 16),
             const Padding(
@@ -693,7 +760,10 @@ class ManageShelvesScreen extends StatelessWidget {
                       _getIconData(item.iconName),
                       color: Theme.of(context).colorScheme.primary,
                     ),
-                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(
+                      item.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: Text('${item.price.toStringAsFixed(2)} درهم'),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
@@ -757,22 +827,24 @@ class ManageShelvesScreen extends StatelessWidget {
                 const Text('اختيار أيقونة:'),
                 Wrap(
                   spacing: 8,
-                  children: [
-                    'bakery_dining',
-                    'emoji_food_beverage',
-                    'opacity',
-                    'grain',
-                    'water_drop',
-                    'shopping_cart'
-                  ].map((iconName) {
-                    return IconButton(
-                      icon: Icon(_getIconData(iconName)),
-                      color: selectedIcon == iconName
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.grey,
-                      onPressed: () => setDialogState(() => selectedIcon = iconName),
-                    );
-                  }).toList(),
+                  children:
+                      [
+                        'bakery_dining',
+                        'emoji_food_beverage',
+                        'opacity',
+                        'grain',
+                        'water_drop',
+                        'shopping_cart',
+                      ].map((iconName) {
+                        return IconButton(
+                          icon: Icon(_getIconData(iconName)),
+                          color: selectedIcon == iconName
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey,
+                          onPressed: () =>
+                              setDialogState(() => selectedIcon = iconName),
+                        );
+                      }).toList(),
                 ),
               ],
             ),
@@ -788,13 +860,13 @@ class ManageShelvesScreen extends StatelessWidget {
                 final price = double.tryParse(priceController.text);
                 if (name.isNotEmpty && price != null) {
                   context.read<AppState>().addItemToShop(
-                        LedgerItem(
-                          name: name,
-                          price: price,
-                          quantite: 1.0,
-                          iconName: selectedIcon,
-                        ),
-                      );
+                    LedgerItem(
+                      name: name,
+                      price: price,
+                      quantite: 1.0,
+                      iconName: selectedIcon,
+                    ),
+                  );
                   Navigator.pop(context);
                 }
               },
@@ -813,7 +885,8 @@ class MerchantQRCodeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    final shopId = appState.currentUser?.shopId ?? appState.currentUser?.id ?? '';
+    final shopId =
+        appState.currentUser?.shopId ?? appState.currentUser?.id ?? '';
     final merchantLinkData = 'merchant-link:$shopId';
 
     return Scaffold(
@@ -862,9 +935,18 @@ class MerchantQRCodeScreen extends StatelessWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
-                  Flexible(child: Text('شارك هذا الرمز فقط مع من تثق به.', style: TextStyle(fontSize: 12))),
+                  Flexible(
+                    child: Text(
+                      'شارك هذا الرمز فقط مع من تثق به.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -900,22 +982,35 @@ class ManageMerchantsScreen extends StatelessWidget {
                 children: [
                   Icon(Icons.people_outline, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('لا يوجد تجار مساعدون حتى الآن.', style: TextStyle(color: Colors.grey)),
+                  Text(
+                    'لا يوجد تجار مساعدون حتى الآن.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ],
               ),
             )
           : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: merchants.length,
-              separatorBuilder: (_, __) => const Divider(),
+              separatorBuilder: (_, _) => const Divider(),
               itemBuilder: (context, index) {
                 final merchant = merchants[index];
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: Colors.blueGrey.shade100,
-                    child: Text(merchant.name.isNotEmpty ? merchant.name[0] : '?'),
+                    backgroundImage: merchant.profileImageUrl != null
+                        ? NetworkImage(merchant.profileImageUrl!)
+                        : null,
+                    child: merchant.profileImageUrl == null
+                        ? Text(
+                            merchant.name.isNotEmpty ? merchant.name[0] : '?',
+                          )
+                        : null,
                   ),
-                  title: Text(merchant.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(
+                    merchant.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: const Text('تاجر مساعد'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -928,38 +1023,66 @@ class ManageMerchantsScreen extends StatelessWidget {
                             context: context,
                             builder: (_) => AlertDialog(
                               title: const Text('تحويل المحل'),
-                              content: Text('هل تريد أن تمرر المحل كاملاً لـ "${merchant.name}"؟ ستفقد صلاحياتك.'),
+                              content: Text(
+                                'هل تريد أن تمرر المحل كاملاً لـ "${merchant.name}"؟ ستفقد صلاحياتك.',
+                              ),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('إلغاء'),
+                                ),
                                 ElevatedButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                                  child: const Text('تأكيد', style: TextStyle(color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                  ),
+                                  child: const Text(
+                                    'تأكيد',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
                                 ),
                               ],
                             ),
                           );
                           if (confirm == true && context.mounted) {
-                            await appState.transferShopOwnership(merchant.id, shopId);
+                            await appState.transferShopOwnership(
+                              merchant.id,
+                              shopId,
+                            );
                             if (context.mounted) context.go('/login');
                           }
                         },
                       ),
                       IconButton(
                         tooltip: 'إلغاء الصلاحيات',
-                        icon: const Icon(Icons.person_remove, color: Colors.red),
+                        icon: const Icon(
+                          Icons.person_remove,
+                          color: Colors.red,
+                        ),
                         onPressed: () async {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (_) => AlertDialog(
                               title: const Text('إلغاء الصلاحيات'),
-                              content: Text('سيتم حذف "${merchant.name}" من فريق المحل. لن يتمكن من الدخول بعد الآن.'),
+                              content: Text(
+                                'سيتم حذف "${merchant.name}" من فريق المحل. لن يتمكن من الدخول بعد الآن.',
+                              ),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('إلغاء'),
+                                ),
                                 ElevatedButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                  child: const Text('حذف', style: TextStyle(color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                  ),
+                                  child: const Text(
+                                    'حذف',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1016,9 +1139,9 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -1087,7 +1210,9 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
                         _joinShop(code);
                       } else if (code != null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('هذا الرمز ليس خاصاً بدعوة التجار.')),
+                          const SnackBar(
+                            content: Text('هذا الرمز ليس خاصاً بدعوة التجار.'),
+                          ),
                         );
                       }
                     },
@@ -1101,13 +1226,18 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
             const SizedBox(height: 16),
 
             // Manual entry
-            const Text('أو أدخل كود المحل يدوياً:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'أو أدخل كود المحل يدوياً:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             TextField(
               controller: _codeController,
               decoration: InputDecoration(
                 hintText: 'مثال: abc123...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 prefixIcon: const Icon(Icons.store),
               ),
             ),
@@ -1117,14 +1247,23 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
                   ? null
                   : () => _joinShop(_codeController.text.trim()),
               icon: _loading
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.login),
               label: const Text('انضمام'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],

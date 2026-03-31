@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:uuid/uuid.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:async';
 import '../models/models.dart';
 
@@ -19,6 +20,7 @@ class AppState extends ChangeNotifier {
   List<LedgerItem> _availableItems = [];
   List<LedgerTransaction> _transactions = [];
   CurrencyMode _currencyMode = CurrencyMode.dirham;
+  String _appVersion = '0.0.1';
 
   StreamSubscription? _usersSub;
   StreamSubscription? _itemsSub;
@@ -28,7 +30,12 @@ class AppState extends ChangeNotifier {
     _init();
   }
 
-  void _init() {
+  void _init() async {
+    // Fetch version
+    final packageInfo = await PackageInfo.fromPlatform();
+    _appVersion = packageInfo.version;
+    notifyListeners();
+
     _auth.authStateChanges().listen((User? user) async {
       if (user == null) {
         _currentUser = null;
@@ -104,6 +111,7 @@ class AppState extends ChangeNotifier {
   // Getters
   AppUser? get currentUser => _currentUser;
   bool get needsRoleSelection => _needsRoleSelection;
+  String get appVersion => _appVersion;
 
   List<AppUser> getCustomersForShop(String shopId) {
     return _allUsers
@@ -219,6 +227,20 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } else {
       _needsRoleSelection = false;
+      // Sync profile info from Google to Firestore for existing users
+      final userData = doc.data();
+      if (userData != null) {
+        final updates = <String, dynamic>{};
+        if (cred.user!.photoURL != null && userData['profileImageUrl'] != cred.user!.photoURL) {
+          updates['profileImageUrl'] = cred.user!.photoURL;
+        }
+        // Also sync name if it's missing or different and not manually changed? 
+        // For now let's just sync the photo as it's the requested fix.
+        
+        if (updates.isNotEmpty) {
+          await _firestore.collection('users').doc(userUid).update(updates);
+        }
+      }
       await _fetchCurrentUser(userUid);
     }
   }

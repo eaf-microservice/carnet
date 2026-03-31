@@ -29,13 +29,18 @@ class AppDrawer extends StatelessWidget {
             ),
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
-              child: Text(
-                user.name[0],
-                style: TextStyle(
-                  fontSize: 24.0,
-                  color: Theme.of(context).primaryColor,
-                ),
-              ),
+              backgroundImage: user.profileImageUrl != null
+                  ? NetworkImage(user.profileImageUrl!)
+                  : null,
+              child: user.profileImageUrl == null
+                  ? Text(
+                      user.name.isEmpty ? '?' : user.name[0],
+                      style: TextStyle(
+                        fontSize: 24.0,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    )
+                  : null,
             ),
             decoration: BoxDecoration(
               color: Theme.of(context).primaryColor,
@@ -141,14 +146,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'حول التطبيق',
                   onTap: () {
                     Navigator.pop(context);
-                    AboutMe(
-                      applicationName: 'كارني الكريدي',
-                      version: '0.0.1',
-                      logo: Image.asset('assets/icon/icon.png', height: 100),
-                      legalese: "جميع الحقوق محفوظة لتطبيق كارني الكريدي",
-                      description:
-                          'تطبيق كارني الكريدي هو تطبيق لإدارة الحسابات بين التجار والزبائن',
-                    ).showCustomAbout(context);
+                    _showAboutMe(context);
                   },
                 ),
               ],
@@ -168,6 +166,18 @@ class AppDrawer extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _showAboutMe(BuildContext context) {
+    final appState = context.read<AppState>();
+    return AboutMe(
+      applicationName: 'كارني الكريدي',
+      version: appState.appVersion,
+      logo: Image.asset('assets/icon/icon.png', height: 100),
+      legalese: "جميع الحقوق محفوظة لتطبيق كارني الكريدي",
+      description:
+          'تطبيق كارني الكريدي هو تطبيق لإدارة الحسابات بين التجار والزبائن',
+    ).showCustomAbout(context);
   }
 }
 
