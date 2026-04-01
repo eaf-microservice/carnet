@@ -599,4 +599,99 @@ class AppState extends ChangeNotifier {
     }
     await batch.commit();
   }
+
+  /// Archive customer account: Moves all transactions to archive and resets balance
+  /// This happens when a customer pays their full debt and starts fresh
+  Future<void> archiveCustomerAccount(String customerId, String shopId) async {
+    final customer = getCustomerById(customerId);
+    if (customer == null) return;
+
+    try {
+      debugPrint('Archiving account for customer: $customerId in shop: $shopId');
+      
+      final batch = _firestore.batch();
+      
+      // 1. Get all transactions for this customer in this shop
+      final txDocs = await _firestore
+          .collection('transactions')
+          .where('customerId', isEqualTo: customerId)
+          .where('shopId', isEqualTo: shopId)
+          .get();
+
+      // 2. Move transactions to archived_transactions collection
+      final archiveTimestamp = DateTime.now();
+      for (final doc in txDocs.docs) {
+        final txData = doc.data();
+        txData['archivedAt'] = archiveTimestamp.toIso8601String();
+        txData['archiveId'] = 'archive_${const Uuid().v4()}';
+        
+        batch.set(
+          _firestore.collection('archived_transactions').doc(doc.id),
+          txData,
+        );
+        batch.delete(doc.reference);
+      }
+
+      // 3. Reset customer balance to 0
+      customer.shopBalances[shopId] = 0.0;
+      batch.update(
+        _firestore.collection('users').doc(customerId),
+        {'shopBalances': customer.shopBalances},
+      );
+
+      await batch.commit();
+      debugPrint('Customer account archived successfully: $customerId');
+    } catch (e, stack) {
+      debugPrint('ERROR archiving customer account: $e');
+      debugPrint(stack.toString());
+    }
+  }
+
+  /// Delete a customer completely and all their associated data
+  Future<void> deleteCustomer(String customerId, String shopId) async {
+    final customer = getCustomerById(customerId);
+    if (customer == null) return;
+
+    try {
+      debugPrint('Deleting customer: $customerId from shop: $shopId');
+      
+      final batch = _firestore.batch();
+
+      // 1. Get all transactions for this customer
+      final txDocs = await _firestore
+          .collection('transactions')
+          .where('customerId', isEqualTo: customerId)
+          .where('shopId', isEqualTo: shopId)
+          .get();
+
+      // 2. Delete all transactions
+      for (final doc in txDocs.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 3. Remove customer from this shop
+      customer.shopBalances.remove(shopId);
+      customer.shopNicknames.remove(shopId);
+
+      // 4. If customer has no more shops, delete the customer entirely
+      if (customer.shopBalances.isEmpty) {
+        batch.delete(_firestore.collection('users').doc(customerId));
+      } else {
+        // Only remove them from this shop
+        batch.update(
+          _firestore.collection('users').doc(customerId),
+          {
+            'shopBalances': customer.shopBalances,
+            'shopNicknames': customer.shopNicknames,
+          },
+        );
+      }
+
+      await batch.commit();
+      debugPrint('Customer deleted successfully: $customerId');
+    } catch (e, stack) {
+      debugPrint('ERROR deleting customer: $e');
+      debugPrint(stack.toString());
+    }
+  }
 }

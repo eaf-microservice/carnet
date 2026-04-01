@@ -187,6 +187,42 @@ class CustomerList extends StatelessWidget {
                 ),
               ],
             ),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('حذف العميل'),
+                    content: Text(
+                      'هل أنت متأكد من حذف "${customer.shopNicknames[shopId] ?? customer.name}"؟\n\nسيتم حذف جميع العمليات المرتبطة به من هذا المحل.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('إلغاء'),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        onPressed: () {
+                          context.read<AppState>().deleteCustomer(
+                            customer.id,
+                            shopId,
+                          );
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'حذف',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
             onTap: () => context.push('/owner/customers/${customer.id}'),
           );
         },
@@ -306,32 +342,88 @@ class CustomerLedger extends StatelessWidget {
     String shopId,
   ) {
     final appState = context.read<AppState>();
+    final customer = appState.getCustomerById(customerId);
+    final currentBalance = customer?.shopBalances[shopId] ?? 0.0;
+
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تسديد مبلغ (خلاص)'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'المبلغ المسدد (درهم)',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.money_off, color: Colors.green),
-          ),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('الرصيد الحالي: ${appState.formatCurrency(currentBalance)}'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'المبلغ المسدد (درهم)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.money_off, color: Colors.green),
+              ),
+              autofocus: true,
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('إلغاء'),
           ),
+          // Quick full payment button
+          ElevatedButton(
+            onPressed: () {
+              if (currentBalance > 0) {
+                appState.addPayment(customerId, shopId, currentBalance);
+                appState.archiveCustomerAccount(customerId, shopId);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('تم تسديد الديون وأرشفة السجلات'),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('دفع كامل'),
+          ),
           ElevatedButton(
             onPressed: () {
               final amount = double.tryParse(controller.text);
               if (amount != null && amount > 0) {
                 appState.addPayment(customerId, shopId, amount);
-                Navigator.pop(context);
+
+                // Check if balance is now zero or close to zero
+                final updatedCustomer = appState.getCustomerById(customerId);
+                final newBalance = updatedCustomer?.shopBalances[shopId] ?? 0.0;
+
+                // If fully paid, archive the account
+                if (newBalance.abs() < 0.01) {
+                  // Allow for floating point precision
+                  appState.archiveCustomerAccount(customerId, shopId);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('تم تسديد الديون وأرشفة السجلات'),
+                    ),
+                  );
+                } else {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'تم تسجيل الدفع. الرصيد المتبقي: ${appState.formatCurrency(newBalance)}',
+                      ),
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -370,6 +462,41 @@ class CustomerLedger extends StatelessWidget {
             icon: const Icon(Icons.edit_note),
             onPressed: () => _showEditNicknameDialog(context, customer, shopId),
             tooltip: 'تعديل اللقب',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('حذف العميل'),
+                  content: Text(
+                    'هل أنت متأكد من حذف "$displayName"؟\n\nسيتم حذف جميع العمليات المرتبطة به من هذا المحل.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('إلغاء'),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                      onPressed: () {
+                        appState.deleteCustomer(customerId, shopId);
+                        Navigator.pop(context);
+                        context.pop(); // Go back after deletion
+                      },
+                      child: const Text(
+                        'حذف',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+            tooltip: 'حذف العميل',
           ),
         ],
       ),
