@@ -1,7 +1,7 @@
 name: carnet
-description: "A new Flutter project."
+description: "هو تطبيق متطور يهدف إلى رقمنة عملية تتبع الديون (الكريدي) التقليدية بين أصحاب المتاجر والزبائن. يحل التطبيق محل الكناش الورقي القديم بنظام سحابي آمن وسهل الاستخدام."
 publish_to: "none"
-version: 0.0.5+5
+version: 0.0.6+6
 
 environment:
   sdk: ^3.11.1

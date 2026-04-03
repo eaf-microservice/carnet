@@ -370,67 +370,82 @@ class CustomerLedger extends StatelessWidget {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          // Quick full payment button
-          ElevatedButton(
-            onPressed: () {
-              if (currentBalance > 0) {
-                appState.addPayment(customerId, shopId, currentBalance);
-                appState.archiveCustomerAccount(customerId, shopId);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('تم تسديد الديون وأرشفة السجلات'),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (currentBalance > 0) {
+                      appState.addPayment(customerId, shopId, currentBalance);
+                      appState.archiveCustomerAccount(customerId, shopId);
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم تسديد الديون وأرشفة السجلات'),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
                   ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('دفع كامل'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final amount = double.tryParse(controller.text);
-              if (amount != null && amount > 0) {
-                appState.addPayment(customerId, shopId, amount);
+                  child: const Text('دفع كامل'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final amount = double.tryParse(controller.text);
+                    if (amount != null && amount > 0) {
+                      appState.addPayment(customerId, shopId, amount);
 
-                // Check if balance is now zero or close to zero
-                final updatedCustomer = appState.getCustomerById(customerId);
-                final newBalance = updatedCustomer?.shopBalances[shopId] ?? 0.0;
+                      // Check if balance is now zero or close to zero
+                      final updatedCustomer = appState.getCustomerById(customerId);
+                      final newBalance = updatedCustomer?.shopBalances[shopId] ?? 0.0;
 
-                // If fully paid, archive the account
-                if (newBalance.abs() < 0.01) {
-                  // Allow for floating point precision
-                  appState.archiveCustomerAccount(customerId, shopId);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('تم تسديد الديون وأرشفة السجلات'),
-                    ),
-                  );
-                } else {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'تم تسجيل الدفع. الرصيد المتبقي: ${appState.formatCurrency(newBalance)}',
-                      ),
-                    ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('تسجيل الخلاص'),
+                      // If fully paid, archive the account
+                      if (newBalance.abs() < 0.01) {
+                        // Allow for floating point precision
+                        appState.archiveCustomerAccount(customerId, shopId);
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('تم تسديد الديون وأرشفة السجلات'),
+                          ),
+                        );
+                      } else {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'تم تسجيل الدفع. الرصيد المتبقي: ${appState.formatCurrency(newBalance)}',
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('تسجيل الخلاص'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إلغاء'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
